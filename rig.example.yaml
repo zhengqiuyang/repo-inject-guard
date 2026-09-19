@@ -1,0 +1,19 @@
+# repo-inject-guard configuration example.
+#
+# Copy to your working directory as rig.yaml. IMPORTANT: the config is read
+# from the OPERATOR side (cwd or --config) — never from the scanned repo,
+# so a hostile repository cannot ship a rig.yaml that opts out of scanning.
+
+# Which agent surface profiles to scan (default: [all]).
+# Valid: claude-code, codex, cursor, copilot, gemini, opencode, all
+profiles:
+  - all
+
+# Extra files YOUR setup auto-reads (your agent, your plugins).
+# Glob syntax: ** crosses directories, * within one segment, bare filenames
+# match at any depth.
+extraPaths:
+  - docs/AGENT-NOTES.md
+
+# Paths to exclude from scanning. Use sparingly — every entry is a blind spot.
+ignore: []

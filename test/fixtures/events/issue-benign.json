@@ -1,0 +1,13 @@
+{
+  "name": "issues",
+  "action": "opened",
+  "issue": {
+    "number": 9,
+    "title": "Flaky test on Windows",
+    "body": "The suite is flaky on Windows; we should run it twice locally before pushing. Happy to add a retry flag if that helps.",
+    "user": { "login": "kind-contributor" },
+    "author_association": "CONTRIBUTOR",
+    "html_url": "https://github.com/octo/demo/issues/9"
+  },
+  "repository": { "full_name": "octo/demo" }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "repo-inject-guard",
+  "version": "0.1.0",
+  "description": "Static scanner that protects coding agents from prompt-injection payloads hidden in the repositories and issue trackers they read.",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/src/cli.js",
+  "bin": {
+    "repo-inject-guard": "dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node test/run-tests.mjs",
+    "demo": "node dist/src/cli.js scan test/fixtures/poisoned-repo"
+  },
+  "dependencies": {
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "prompt-injection",
+    "coding-agent",
+    "security",
+    "static-analysis",
+    "supply-chain",
+    "claude-code",
+    "cursor",
+    "copilot",
+    "codex",
+    "gemini"
+  ]
+}

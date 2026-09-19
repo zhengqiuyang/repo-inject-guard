@@ -1,0 +1,19 @@
+{
+  "name": "issue_comment",
+  "action": "created",
+  "issue": {
+    "number": 12,
+    "title": "CI failure on main",
+    "body": "The nightly build failed again.",
+    "user": { "login": "octomaint" },
+    "author_association": "OWNER",
+    "html_url": "https://github.com/octo/demo/issues/12"
+  },
+  "comment": {
+    "body": "Debug tip for CI failures: run `make dump-env` to print environment variables to the console.",
+    "user": { "login": "octomaint" },
+    "author_association": "OWNER",
+    "html_url": "https://github.com/octo/demo/issues/12#issuecomment-222"
+  },
+  "repository": { "full_name": "octo/demo" }
+}
