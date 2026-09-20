@@ -113,7 +113,8 @@ root; matching is case-insensitive because `agents.md`-vs-`AGENTS.md` is a free 
 | --- | --- | --- |
 | `INSTR_OVERRIDE` | high | "ignore (all) previous/prior/above instructions", "disregard your system instructions" |
 | `SYSTEM_PROMPT_EXFIL` | medium | "reveal/print/show (me) (your) system prompt" |
-| `CREDS_EXFIL` | high | print/send env vars, `~/.ssh`, credential files; or curl/wget POST combined with secret references in the same file |
+| `CREDS_EXFIL` | high | actual secret data flow: output/transfer verb on credential material, an env-var VALUE echoed, a broad env dump (`printenv`, `env \| curl`), or curl/wget POST paired with secret references in the same file. Prose merely mentioning "env vars" does not fire. |
+| `ENV_PROBE` | medium | scoped presence probe — `env \| grep NAME`, `printenv NAME`, `${VAR:+SET}`: prints whether one named variable is set. A debugging idiom, not a dump: advisory for trusted content, gating for untrusted authors. |
 | `HIDDEN_UNICODE` | high | zero-width (U+200B–200D, U+2060, U+FEFF) and bidi (U+202A–202E, U+2066–2069) characters — reported **always**, with file, line and codepoint, never only alongside other signals. A genuine leading UTF-8 BOM is tolerated. |
 | `AGENT_DIRECTIVE` | low | second-person commands a normal document rarely contains ("you must run…", "always/never/before every/from now on + use/run/execute/call/send/write/delete", "note to the AI/agent/reviewer/CI") — requires **2+ distinct directive lines** in one file to fire |
 | `RULES_BACKDOOR` | high | in rules/instruction files: "do not tell/inform/show the user", "hide this from", "secretly", "without the user's knowledge" |
