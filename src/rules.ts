@@ -5,6 +5,7 @@
  * rule (AGENT_DIRECTIVE) requires corroboration (2+ distinct lines).
  */
 import { excerpt, splitLines, findHiddenCodepointNames } from './util.js';
+import { decodeBase64Extras, normalizeForMatch } from './normalize.js';
 
 export type Severity = 'high' | 'medium' | 'low';
 export type TrustLevel = 'trusted' | 'neutral' | 'untrusted';
@@ -240,6 +241,12 @@ function hostOf(url: string): string {
 
 export function applyRules(text: string, ctx: RuleContext): Finding[] {
   const lines = splitLines(text);
+  // Pattern rules match against obfuscation-normalized text (zero-width
+  // stripping, fullwidth folding, homoglyph folding); evidence keeps the
+  // raw line so humans see exactly what the file contains. Raw-character
+  // detections (HIDDEN_UNICODE, base64 blobs, homoglyph hosts) stay on raw.
+  const norm = lines.map((l) => normalizeForMatch(l));
+  const extras = decodeBase64Extras(lines);
   const findings: Finding[] = [];
   const trust: TrustLevel = ctx.trust ?? 'neutral';
 
@@ -256,7 +263,8 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
 
   // INSTR_OVERRIDE + SYSTEM_PROMPT_EXFIL: any scanned text
   lines.forEach((line, i) => {
-    if (INSTR_OVERRIDE_PATTERNS.some((re) => re.test(line))) {
+    const m = norm[i] as string;
+    if (INSTR_OVERRIDE_PATTERNS.some((re) => re.test(m))) {
       push(
         'INSTR_OVERRIDE',
         'Instruction-override attempt: text tries to cancel or replace the agent\'s standing instructions.',
@@ -264,7 +272,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
         fileLineOf(ctx, i)
       );
     }
-    if (SYSTEM_PROMPT_EXFIL_RE.test(line)) {
+    if (SYSTEM_PROMPT_EXFIL_RE.test(m)) {
       push(
         'SYSTEM_PROMPT_EXFIL',
         'System prompt extraction: asks the agent to reveal its system prompt.',
@@ -277,7 +285,8 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
   // CREDS_EXFIL (high: real data flow) + ENV_PROBE (medium: presence probe)
   const credLines = new Set<number>();
   lines.forEach((line, i) => {
-    if (SCOPED_PROBE_RE.test(line)) {
+    const m = norm[i] as string;
+    if (SCOPED_PROBE_RE.test(m)) {
       credLines.add(i);
       push(
         'ENV_PROBE',
@@ -287,9 +296,9 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
       );
       return;
     }
-    const verb = EXFIL_VERB_RE.test(line);
-    const fileCred = FILE_CRED_RE.test(line);
-    if (fileCred && (verb || BROAD_DUMP_RE.test(line))) {
+    const verb = EXFIL_VERB_RE.test(m);
+    const fileCred = FILE_CRED_RE.test(m);
+    if (fileCred && (verb || BROAD_DUMP_RE.test(m))) {
       credLines.add(i);
       push(
         'CREDS_EXFIL',
@@ -299,7 +308,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
       );
       return;
     }
-    if (BROAD_DUMP_RE.test(line)) {
+    if (BROAD_DUMP_RE.test(m)) {
       credLines.add(i);
       push(
         'CREDS_EXFIL',
@@ -309,7 +318,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
       );
       return;
     }
-    if (verb && hasValueExpansion(line)) {
+    if (verb && hasValueExpansion(m)) {
       credLines.add(i);
       push(
         'CREDS_EXFIL',
@@ -322,7 +331,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
     // Prose instruction to expose environment variables — no literal data flow
     // on the line. Advisory for trusted content (own repos use this idiom in
     // lessons), gating for untrusted authors.
-    if (PROSE_ENV_RE.test(line)) {
+    if (PROSE_ENV_RE.test(m)) {
       credLines.add(i);
       push(
         'ENV_PROBE',
@@ -332,10 +341,11 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
       );
     }
   });
-  const sawCredAnywhere = lines.some((l) => FILE_CRED_RE.test(l) || hasValueExpansion(l));
+  const sawCredAnywhere = lines.some((l, i) => FILE_CRED_RE.test(norm[i] as string) || hasValueExpansion(norm[i] as string));
   if (sawCredAnywhere) {
     lines.forEach((line, i) => {
-      if (!credLines.has(i) && POST_TOOL_RE.test(line) && POST_FLAG_RE.test(line)) {
+      const m = norm[i] as string;
+      if (!credLines.has(i) && POST_TOOL_RE.test(m) && POST_FLAG_RE.test(m)) {
         push(
           'CREDS_EXFIL',
           'Credential/environment exfiltration: curl/wget POST combined with secret references elsewhere in the same file.',
@@ -344,6 +354,26 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
         );
       }
     });
+  }
+
+  // Base64-decoded extras: instructions smuggled inside long blobs are
+  // matched (and reported) as decoded text, anchored to the blob's line.
+  for (const extra of extras) {
+    const m = normalizeForMatch(extra.text);
+    const evidence = `(base64-decoded) ${extra.text.slice(0, 120)}`;
+    const loc = fileLineOf(ctx, extra.line);
+    if (INSTR_OVERRIDE_PATTERNS.some((re) => re.test(m))) {
+      push('INSTR_OVERRIDE', 'Instruction-override attempt decoded from a base64 blob.', evidence, loc);
+    }
+    if (SYSTEM_PROMPT_EXFIL_RE.test(m)) {
+      push('SYSTEM_PROMPT_EXFIL', 'System prompt extraction request decoded from a base64 blob.', evidence, loc);
+    }
+    if (POST_TOOL_RE.test(m) && POST_FLAG_RE.test(m)) {
+      push('CREDS_EXFIL', 'Exfiltration POST decoded from a base64 blob.', evidence, loc);
+    }
+    if (RULES_BACKDOOR_PATTERNS.some((re) => re.test(m))) {
+      push('RULES_BACKDOOR', 'Rules-file backdoor phrasing decoded from a base64 blob.', evidence, loc);
+    }
   }
 
   // HIDDEN_UNICODE: always a finding, line 1 leading BOM excepted (real BOMs)
@@ -364,7 +394,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
   if (ctx.markdownLike) {
     const directiveLines: { line: number; text: string }[] = [];
     lines.forEach((line, i) => {
-      if (AGENT_DIRECTIVE_RE.test(line) || NOTE_TO_AGENT_RE.test(line)) {
+      if (AGENT_DIRECTIVE_RE.test(norm[i] as string) || NOTE_TO_AGENT_RE.test(norm[i] as string)) {
         directiveLines.push({ line: i + 1, text: line });
       }
     });
@@ -384,7 +414,7 @@ export function applyRules(text: string, ctx: RuleContext): Finding[] {
   // RULES_BACKDOOR: instruction files and tracker text only
   if (ctx.instructionFile) {
     lines.forEach((line, i) => {
-      if (RULES_BACKDOOR_PATTERNS.some((re) => re.test(line))) {
+      if (RULES_BACKDOOR_PATTERNS.some((re) => re.test(norm[i] as string))) {
         push(
           'RULES_BACKDOOR',
           'Rules-file backdoor phrasing: instructs the agent to conceal actions from the user.',

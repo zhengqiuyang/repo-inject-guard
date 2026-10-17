@@ -1,6 +1,6 @@
 {
   "name": "repo-inject-guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scan what your coding agent READS — repo poisoning / prompt-injection detection for rules files, docs, issues and PRs",
   "type": "module",
   "license": "MIT",
