@@ -1,6 +1,7 @@
 # repo-inject-guard
 
 > **If this helps you, please give it a star** — it helps others find it. Thanks!
+
 **A static scanner that protects coding agents from the repositories and issue trackers they read.**
 
 Modern coding agents do not just *execute* code — they **read** your repository and **obey** what they find.
